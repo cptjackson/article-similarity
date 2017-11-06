@@ -1,34 +1,29 @@
 import spacy, textract, os, re, math
 import numpy as np
 import pandas as pd
-from collections import Counter
-from textblob import TextBlob as tb
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 
 
-def tokenize_only(text):
-
-    #print(text)
+def token_lemma(text):
 
     tokens = [token.text for token in text if token.is_stop != True
                          and token.is_punct != True]
 
-    #print(tokens)
-    #print(tokens[0])
-    #print(len(text))
+    lemmas = [token.lemma_ for token in text if token.is_stop != True
+                         and token.is_punct != True]
 
     # first tokenize by sentence, then by word to ensure that punctuation is caught as it's own token
     #tokens = [word.lower() for sent in nltk.sent_tokenize(text) for word in nltk.word_tokenize(sent)]
     filtered_tokens = []
+    filtered_lemmas = []
     # filter out any tokens not containing letters (e.g., numeric tokens, raw punctuation)
-    for token in tokens:
-        #if re.search('[a-zA-Z]', token):
-        filtered_tokens.append(token.lower())
+    for ind,token in enumerate(tokens):
+        if re.search('[a-zA-Z]', token):
+            filtered_tokens.append(token.lower())
+            filtered_lemmas.append(lemmas[ind])
 
-    #print(filtered_tokens[0])
-
-    return filtered_tokens
+    return [filtered_tokens,filtered_lemmas]
 
 # Cluster algorithm
 def cluster(tfidf_matrix,num_clusters):
@@ -39,18 +34,6 @@ def cluster(tfidf_matrix,num_clusters):
 
     return [clusters,km]
 
-# Textblob functions
-def tf(word, blob):
-    return blob.words.count(word) / len(blob.words)
-
-def n_containing(word, bloblist):
-    return sum(1 for blob in bloblist if word in blob.words)
-
-def idf(word, bloblist):
-    return math.log(len(bloblist) / (1 + n_containing(word, bloblist)))
-
-def tfidf(word, blob, bloblist):
-    return tf(word, blob) * idf(word, bloblist)
 
 # Extract text from files and return list of strings
 def extract_text(path,method):
@@ -143,14 +126,16 @@ if __name__ == '__main__':
     #tokenize_only(spacy_texts[0])
 
     totalvocab_tokenized = []
+    totalvocab_lemmatized = []
     for i in spacy_texts:
-        #allwords_stemmed = tokenize_and_stem(i) #for each item in 'synopses', tokenize/stem
+        #allwords_lemmatized = tokenize_and_stem(i) #for each item in 'synopses', tokenize/stem
         #totalvocab_stemmed.extend(allwords_stemmed) #extend the 'totalvocab_stemmed' list
 
-        allwords_tokenized = tokenize_only(i)
+        [allwords_tokenized, allwords_lemmatized] = token_lemma(i)
         totalvocab_tokenized.extend(allwords_tokenized)
+        totalvocab_lemmatized.extend(allwords_lemmatized)
 
-    vocab_frame = pd.DataFrame({'words': totalvocab_tokenized})
+    vocab_frame = pd.DataFrame({'words': totalvocab_tokenized},index = totalvocab_lemmatized)
     print('there are ' + str(vocab_frame.shape[0]) + ' items in vocab_frame')
 
     #print(vocab_frame.iloc[4147])
@@ -180,7 +165,7 @@ if __name__ == '__main__':
         print("Cluster %d words: " % i, end='')
 
         for ind in order_centroids[i, :terms_per_cluster]: #replace 6 with n words per cluster
-            #print(terms[ind].split(' '))
+            #print(vocab_frame.ix[terms[ind].split(' ')])
             print(terms[ind], end=' ')
             #print(' %s' % vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0], end=',')
         print() #add whitespace
